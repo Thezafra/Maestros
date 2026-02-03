@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1001637506211",
+    "project_id": "maestros-ad9d0",
+    "storage_bucket": "maestros-ad9d0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1001637506211:android:2372297252ffab7dc62316",
+        "android_client_info": {
+          "package_name": "com.example.maestros"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyIxE_rXwkZWhoaQmYjilgq1Z1MDmKg2M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1001637506211:android:ffd8cf28c70eefc3c62316",
+        "android_client_info": {
+          "package_name": "com.example.marketplace_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyIxE_rXwkZWhoaQmYjilgq1Z1MDmKg2M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
