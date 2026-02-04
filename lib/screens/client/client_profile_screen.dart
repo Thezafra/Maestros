@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'edit_profile_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'client_reservations_screen.dart';
 
@@ -35,76 +38,98 @@ class ClientProfileScreen extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            // Avatar
-            const CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.deepPurple,
-              child: Icon(Icons.person, size: 50, color: Colors.white),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Usuario Cliente',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              'cliente@email.com',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 32),
-            
-            // Options
-            _ProfileOption(
-              icon: Icons.calendar_month_outlined,
-              title: 'Mis Reservas',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ClientReservationsScreen()),
+        child: StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('clients')
+                  .doc(FirebaseAuth.instance.currentUser?.uid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+                final name = userData['name'] ?? 'Usuario';
+                final email = userData['email'] ?? 'No email';
+                final photoUrl = userData['photoUrl'];
+
+                return Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.deepPurple,
+                      backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                      child: photoUrl == null
+                          ? const Icon(Icons.person, size: 50, color: Colors.white)
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      email,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    
+                    // Options
+                    _ProfileOption(
+                      icon: Icons.calendar_month_outlined,
+                      title: 'Mis Reservas',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ClientReservationsScreen()),
+                        );
+                      },
+                    ),
+                    _ProfileOption(
+                      icon: Icons.person_outline,
+                      title: 'Editar Perfil',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EditProfileScreen(userData: userData),
+                          ),
+                        );
+                      },
+                    ),
+                    // Payment Methods removed
+                    _ProfileOption(
+                      icon: Icons.favorite_border,
+                      title: 'Favoritos',
+                      onTap: () {
+                         ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Próximamente: Favoritos')),
+                        );
+                      },
+                    ),
+                    _ProfileOption(
+                      icon: Icons.help_outline,
+                      title: 'Ayuda / Soporte',
+                      onTap: () {},
+                    ),
+                    const SizedBox(height: 20),
+                    _ProfileOption(
+                      icon: Icons.logout,
+                      title: 'Cerrar Sesión',
+                      isDestructive: true,
+                      onTap: () => _logout(context),
+                    ),
+                  ],
                 );
               },
             ),
-            _ProfileOption(
-              icon: Icons.person_outline,
-              title: 'Editar Perfil',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Próximamente: Editar Perfil')),
-                );
-              },
-            ),
-            // Payment Methods removed
-            _ProfileOption(
-              icon: Icons.favorite_border,
-              title: 'Favoritos',
-              onTap: () {
-                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Próximamente: Favoritos')),
-                );
-              },
-            ),
-            _ProfileOption(
-              icon: Icons.help_outline,
-              title: 'Ayuda / Soporte',
-              onTap: () {},
-            ),
-            const SizedBox(height: 20),
-            _ProfileOption(
-              icon: Icons.logout,
-              title: 'Cerrar Sesión',
-              isDestructive: true,
-              onTap: () => _logout(context),
-            ),
-          ],
-        ),
       ),
     );
   }

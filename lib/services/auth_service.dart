@@ -32,7 +32,7 @@ class AuthService {
     // 3. Create a new credential
     final OAuthCredential credential = GoogleAuthProvider.credential(
       idToken: googleAuth.idToken,
-      accessToken: null,
+      accessToken: googleAuth.accessToken,
     );
 
     // 4. Sign in to Firebase with the credential
