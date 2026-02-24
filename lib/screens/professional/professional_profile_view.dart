@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'edit_professional_profile_screen.dart';
 
 class ProfessionalProfileView extends StatelessWidget {
   const ProfessionalProfileView({super.key});
@@ -73,7 +74,10 @@ class ProfessionalProfileView extends StatelessWidget {
               const SizedBox(height: 40),
               
               _optionTile(Icons.person_outline, 'Editar Datos Personales', () {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Próximamente: Editar Datos')));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EditProfessionalProfileScreen()),
+                );
               }),
               _optionTile(Icons.work_outline, 'Mis Servicios', () {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Próximamente: Mis Servicios')));

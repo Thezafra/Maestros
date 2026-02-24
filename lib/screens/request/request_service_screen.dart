@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../models/professional.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class RequestServiceScreen extends StatefulWidget {
   final Professional professional;
@@ -17,13 +20,96 @@ class RequestServiceScreen extends StatefulWidget {
 
 class _RequestServiceScreenState extends State<RequestServiceScreen> {
   final _detailsCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
 
   bool _isEmergency = false;
   DateTime? _selectedDateTime;
 
   @override
+  void initState() {
+    super.initState();
+    _loadUserAddress();
+  }
+// ...
+  Future<void> _loadUserAddress() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      final doc = await FirebaseFirestore.instance.collection('clients').doc(uid).get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _addressCtrl.text = doc.data()?['address'] ?? '';
+        });
+      }
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() => _loading = true);
+    try {
+      // 1. Check/Request Permissions
+      var status = await Permission.location.request();
+      if (status.isPermanentlyDenied) {
+        throw 'Permiso de ubicación denegado permanentemente. Habilítalo en ajustes.';
+      }
+      if (!status.isGranted) {
+        throw 'Necesitamos permiso de ubicación para esto.';
+      }
+
+      // 2. Get Position
+      // Check if service is enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw 'El GPS está desactivado. Por favor actívalo.';
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // 3. Reverse Geocoding (Coords -> Address)
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        // Construct address string
+        // e.g. "Av. Providencia 1234, Providencia"
+        final street = place.street ?? '';
+        final subLocality = place.subLocality ?? '';
+        final locality = place.locality ?? '';
+        
+        String address = '$street, $subLocality';
+        if (address.trim() == ',') address = locality; // Fallback
+        
+        setState(() {
+          _addressCtrl.text = address;
+        });
+        
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('📍 Ubicación actualizada')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
   void dispose() {
     _detailsCtrl.dispose();
+    _addressCtrl.dispose();
+    _phoneCtrl.dispose();
     super.dispose();
   }
 
@@ -100,6 +186,7 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
               controller: _detailsCtrl,
               minLines: 3,
               maxLines: 6,
+              maxLength: 500, // Limit details
               decoration: InputDecoration(
                 hintText: 'Ej: Mi lavaplatos gotea y está mojando todo…',
                 filled: true,
@@ -113,102 +200,85 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
 
             const SizedBox(height: 14),
 
-            const Text('Horario', style: TextStyle(fontWeight: FontWeight.w900)),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Es una emergencia',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+              subtitle: const Text('Necesito atención lo antes posible'),
+              value: _isEmergency,
+              onChanged: (val) => setState(() {
+                _isEmergency = val ?? false;
+                if (_isEmergency) _selectedDateTime = null;
+              }),
+            ),
+            
+            if (!_isEmergency) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _pickDateTime,
+                  icon: const Icon(Icons.calendar_month, size: 28),
+                  label: Text(
+                    _selectedDateTime == null
+                        ? 'Seleccionar fecha y hora'
+                        : _dateTimeLabel(_selectedDateTime!),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                    alignment: Alignment.centerLeft,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 20),
+            const Text('Teléfono de contacto (WhatsApp)', style: TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
-
-            // Emergencia (toggle)
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withOpacity(.4),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.local_fire_department_outlined, color: cs.onSurface.withOpacity(.85)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Emergencia', style: TextStyle(fontWeight: FontWeight.w900)),
-                        const SizedBox(height: 2),
-                        Text(
-                          'El profesional llegará ASAP',
-                          style: TextStyle(color: cs.onSurface.withOpacity(.65), fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: _isEmergency,
-                    onChanged: (v) => setState(() => _isEmergency = v),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // Fecha + Hora (un solo bloque)
-            InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: _isEmergency ? null : _pickDateTime,
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest.withOpacity(.4),
+            TextField(
+              controller: _phoneCtrl,
+              keyboardType: TextInputType.phone,
+              maxLength: 20,
+              decoration: InputDecoration(
+                hintText: 'Ej: +569 1234 5678',
+                counterText: "",
+                filled: true,
+                fillColor: cs.surfaceContainerHighest.withOpacity(.4),
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_month),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Seleccionar fecha y hora', style: TextStyle(fontWeight: FontWeight.w900)),
-                          const SizedBox(height: 2),
-                          Text(
-                            _isEmergency
-                                ? 'Lo antes posible'
-                                : (_selectedDateTime == null
-                                    ? 'Toca para elegir'
-                                    : _dateTimeLabel(_selectedDateTime!)),
-                            style: TextStyle(color: cs.onSurface.withOpacity(.7), fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.edit, color: cs.onSurface.withOpacity(.6)),
-                  ],
-                ),
+                prefixIcon: const Icon(Icons.phone_outlined),
               ),
             ),
-
             const SizedBox(height: 16),
 
-            const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w900)),
+            const Text('Ubicación (Dirección)', style: TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withOpacity(.4),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.place_outlined),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Agregar dirección (más adelante)',
-                      style: TextStyle(color: cs.onSurface.withOpacity(.7)),
-                    ),
-                  ),
-                  TextButton(onPressed: () {}, child: const Text('Cambiar')),
-                ],
+            TextField(
+              controller: _addressCtrl,
+              maxLength: 100,
+              decoration: InputDecoration(
+                hintText: 'Ej: Av. Providencia 1234, Santiago',
+                counterText: "", // Clean UI
+                filled: true,
+                fillColor: cs.surfaceContainerHighest.withOpacity(.4),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: const Icon(Icons.place_outlined),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.my_location, color: Colors.blue),
+                  onPressed: _loading ? null : _getCurrentLocation,
+                  tooltip: 'Usar mi ubicación actual',
+                ),
               ),
             ),
 
@@ -239,6 +309,13 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
       return;
     }
 
+    if (_phoneCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor ingresa un teléfono de contacto')),
+      );
+      return;
+    }
+
     if (!_isEmergency && _selectedDateTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selecciona una fecha o marca Emergencia')),
@@ -265,13 +342,16 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
       await FirebaseFirestore.instance.collection('reservations').add({
         'clientId': user.uid,
         'clientName': clientName,
+        'clientPhone': _phoneCtrl.text.trim(), // Save the phone number
         'professionalId': widget.professional.id,
         'professionalName': widget.professional.name,
         'professionalJob': widget.professional.role,
+        'professionalPhone': widget.professional.phone,
         'details': _detailsCtrl.text.trim(),
+        'address': _addressCtrl.text.trim(),
         'isEmergency': _isEmergency,
         'scheduledDate': _isEmergency ? Timestamp.now() : Timestamp.fromDate(_selectedDateTime!),
-        'status': 'Pendiente', // Pendiente, Confirmado, Completado, Rechazado
+        'status': 'Pendiente', 
         'createdAt': FieldValue.serverTimestamp(),
       });
 

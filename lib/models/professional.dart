@@ -23,6 +23,10 @@ class Professional {
   // Restaurando campos eliminados
   final String location;
   final String about;
+  final String phone;
+  final String rut;
+  final String? certificationNumber;
+  final bool isVerified;
 
   const Professional({
     required this.id,
@@ -38,6 +42,10 @@ class Professional {
     this.about = '',
     required this.region,
     required this.commune,
+    this.phone = '',
+    required this.rut,
+    this.certificationNumber,
+    this.isVerified = false,
   });
 
   // Alias para tu UI
@@ -49,14 +57,18 @@ class Professional {
       name: '${data['name']} ${data['lastname']}',
       role: data['job'] ?? 'Profesional',
       category: data['job'] ?? 'Otros',
-      rating: 5.0, // Default for new users
+      rating: (data['rating'] as num?)?.toDouble() ?? 5.0,
       yearsExperience: (data['yearsExperience'] as num?)?.toInt() ?? 0,
-      jobsDone: 0, // Default
-      pricePerHour: 0, // Default
+      jobsDone: (data['jobsDone'] as num?)?.toInt() ?? 0,
+      pricePerHour: (data['price'] as num?)?.toDouble() ?? 0.0,
       location: '${data['commune'] ?? ''}, ${data['region'] ?? ''}',
-      about: 'Sin descripción',
+      about: data['about'] ?? 'Sin descripción',
       region: data['region'] ?? '',
       commune: data['commune'] ?? '',
+      phone: data['phone'] ?? '',
+      rut: data['rut'] ?? '',
+      certificationNumber: data['certificationNumber'],
+      isVerified: data['isVerified'] ?? false,
     );
   }
 }

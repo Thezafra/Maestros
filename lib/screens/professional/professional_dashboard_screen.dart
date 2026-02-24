@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'professional_reservations_screen.dart';
 import 'professional_profile_view.dart';
+import '../../widgets/responsive_layout.dart';
 
 class ProfessionalDashboardScreen extends StatefulWidget {
   const ProfessionalDashboardScreen({super.key});
@@ -13,7 +14,7 @@ class ProfessionalDashboardScreen extends StatefulWidget {
 }
 
 class _ProfessionalDashboardScreenState
-    extends State<ProfessionalDashboardScreen> {
+    extends State<ProfessionalDashboardScreen> with WidgetsBindingObserver {
   int _navIndex = 0;
   bool _isOnline = true;
   String? _userName;
@@ -21,22 +22,57 @@ class _ProfessionalDashboardScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _setOnlineStatus(true);
     _setupUserListener();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _setOnlineStatus(false);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _setOnlineStatus(true);
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _setOnlineStatus(false);
+    }
+  }
+
+  Future<void> _setOnlineStatus(bool online) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('professionals')
+            .doc(user.uid)
+            .update({'isOnline': online});
+      } catch (_) {
+        // Fail silently or log
+      }
+    }
+  }
+
   void _setupUserListener() {
-    // Escuchar autenticación primero
     FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user != null) {
-        // Si hay usuario, escuchar Firestore
         FirebaseFirestore.instance
             .collection('professionals')
             .doc(user.uid)
             .snapshots()
             .listen((doc) {
           if (mounted && doc.exists) {
+            final data = doc.data();
             setState(() {
-              _userName = doc.data()?['name'] ?? 'Maestro';
+              _userName = data?['name'] ?? 'Maestro';
+              if (data != null && data.containsKey('isOnline')) {
+                 _isOnline = data['isOnline'];
+              }
             });
           }
         });
@@ -49,33 +85,75 @@ class _ProfessionalDashboardScreenState
   @override
   Widget build(BuildContext context) {
     // DASHBOARD HOME VIEW
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
-      body: [
-        _buildDashboardHome(),
-        const ProfessionalReservationsScreen(),
-        const ProfessionalProfileView(),
-      ][_navIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _navIndex,
-        onDestinationSelected: (idx) => setState(() => _navIndex = idx),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Inicio',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_today_outlined),
-            selectedIcon: Icon(Icons.calendar_today),
-            label: 'Agenda',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Perfil',
-          ),
-        ],
+    final content = [
+      _buildDashboardHome(),
+      const ProfessionalReservationsScreen(),
+      const ProfessionalProfileView(),
+    ][_navIndex];
+
+    return ResponsiveLayout(
+      mobileBody: Scaffold(
+        backgroundColor: const Color(0xFFF6F7FB),
+        body: content,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _navIndex,
+          onDestinationSelected: (idx) => setState(() => _navIndex = idx),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard),
+              label: 'Inicio',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.calendar_today_outlined),
+              selectedIcon: Icon(Icons.calendar_today),
+              label: 'Agenda',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Perfil',
+            ),
+          ],
+        ),
+      ),
+      desktopBody: Scaffold(
+        backgroundColor: const Color(0xFFF6F7FB),
+        body: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: _navIndex,
+              onDestinationSelected: (idx) => setState(() => _navIndex = idx),
+              labelType: NavigationRailLabelType.all,
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.dashboard_outlined),
+                  selectedIcon: Icon(Icons.dashboard),
+                  label: Text('Inicio'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.calendar_today_outlined),
+                  selectedIcon: Icon(Icons.calendar_today),
+                  label: Text('Agenda'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: Text('Perfil'),
+                ),
+              ],
+            ),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1000),
+                  child: content,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -144,7 +222,7 @@ class _ProfessionalDashboardScreenState
                         Switch(
                           value: _isOnline,
                           activeColor: Colors.blue,
-                          onChanged: (val) => setState(() => _isOnline = val),
+                          onChanged: (val) => _setOnlineStatus(val),
                         ),
                       ],
                     ),
@@ -202,25 +280,68 @@ class _ProfessionalDashboardScreenState
 
             const SizedBox(height: 16),
             
-            // Empty State for Requests
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
-                    SizedBox(height: 12),
-                    Text(
-                      'No hay solicitudes nuevas',
-                      style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+            // Pending Requests List
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseAuth.instance.currentUser != null
+                  ? FirebaseFirestore.instance
+                      .collection('reservations')
+                      .where('professionalId', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
+                      .where('status', isEqualTo: 'Pendiente')
+                      .orderBy('createdAt', descending: true)
+                      .snapshots()
+                  : null,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Text('Error: ${snapshot.error}');
+                }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+
+                if (docs.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  ],
-                ),
-              ),
+                    child: const Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
+                          SizedBox(height: 12),
+                          Text(
+                            'No hay solicitudes nuevas',
+                            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data() as Map<String, dynamic>;
+                    
+                    return _RequestCard(
+                      docId: docs[index].id,
+                      title: data['professionalJob'] ?? 'Servicio',
+                      price: 'Por cotizar', // Or add price field if we had one
+                      distance: data['address'] ?? 'Ubicación remota',
+                      description: data['details'] ?? 'Sin detalles',
+                      urgent: data['isEmergency'] ?? false,
+                      clientName: data['clientName'] ?? 'Cliente',
+                    );
+                  },
+                );
+              },
             ),
           ],
         ),
@@ -288,19 +409,42 @@ class _InfoCard extends StatelessWidget {
 }
 
 class _RequestCard extends StatelessWidget {
+  final String docId;
   final String title;
   final String price;
   final String distance;
   final String description;
   final bool urgent;
+  final String clientName;
 
   const _RequestCard({
+    required this.docId,
     required this.title,
     required this.price,
     required this.distance,
     required this.description,
     required this.urgent,
+    required this.clientName,
   });
+
+  Future<void> _updateStatus(BuildContext context, String newStatus) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('reservations')
+          .doc(docId)
+          .update({'status': newStatus});
+      
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Solicitud $newStatus')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -363,22 +507,32 @@ class _RequestCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
+                    const Icon(Icons.person, size: 14, color: Colors.black54),
+                    const SizedBox(width: 4),
+                    Text(clientName, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
                     const Icon(Icons.location_on, size: 14, color: Colors.black54),
                     const SizedBox(width: 4),
-                    Text('$distance • Santiago, Chile', style: const TextStyle(color: Colors.black54)),
+                    Expanded(child: Text(distance, style: const TextStyle(color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis)),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Text(
                   description,
                   style: const TextStyle(color: Colors.grey, fontSize: 13),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
                       child: FilledButton(
-                        onPressed: () {},
+                        onPressed: () => _updateStatus(context, 'Confirmado'),
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.blue,
                           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -390,7 +544,7 @@ class _RequestCard extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton(
-                        onPressed: () {},
+                        onPressed: () => _updateStatus(context, 'Rechazado'),
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.grey[100],
                           foregroundColor: Colors.black,

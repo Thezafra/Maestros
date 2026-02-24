@@ -9,6 +9,7 @@ class ClientProfileScreen extends StatelessWidget {
   const ClientProfileScreen({super.key});
 
   Future<void> _logout(BuildContext context) async {
+    await FirebaseAuth.instance.signOut();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('user_role');
     if (!context.mounted) return;

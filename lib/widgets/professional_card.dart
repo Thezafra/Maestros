@@ -49,31 +49,52 @@ class ProfessionalCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          professional.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                professional.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (professional.isVerified)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 4),
+                                child: Icon(Icons.verified, size: 16, color: Colors.blue),
+                              ),
+                          ],
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: cs.primaryContainer.withOpacity(.25),
+                          color: professional.jobsDone == 0 
+                              ? cs.secondaryContainer 
+                              : cs.primaryContainer.withOpacity(.25),
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.star, size: 14, color: Colors.amber),
-                            const SizedBox(width: 4),
-                            Text(
-                              professional.rating.toStringAsFixed(1),
-                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
-                            ),
-                          ],
-                        ),
+                        child: professional.jobsDone == 0
+                            ? const Text(
+                                'Nuevo',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                ),
+                              )
+                            : Row(
+                                children: [
+                                  const Icon(Icons.star, size: 14, color: Colors.amber),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    professional.rating.toStringAsFixed(1),
+                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+                                  ),
+                                ],
+                              ),
                       ),
                     ],
                   ),

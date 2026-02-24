@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfessionalReservationsScreen extends StatelessWidget {
   const ProfessionalReservationsScreen({super.key});
@@ -67,9 +68,11 @@ class ProfessionalReservationsScreen extends StatelessWidget {
               if (status == 'Rechazado') statusColor = Colors.red;
 
               return _AgendaItem(
+                docId: docs[index].id,
                 time: timeStr,
                 client: data['clientName'] ?? 'Cliente sin nombre',
-                address: 'Dirección por confirmar', // Placeholder
+                clientPhone: data['clientPhone'], // Pass phone
+                address: data['address'] ?? 'Dirección por confirmar',
                 task: data['details'] ?? 'Sin detalles',
                 status: status,
                 color: statusColor,
@@ -83,24 +86,81 @@ class ProfessionalReservationsScreen extends StatelessWidget {
 }
 
 class _AgendaItem extends StatelessWidget {
+  final String docId;
   final String time;
   final String client;
+  final String? clientPhone;
   final String address;
   final String task;
   final String status;
   final Color color;
 
   const _AgendaItem({
+    required this.docId,
     required this.time,
     required this.client,
+    this.clientPhone,
     required this.address,
     required this.task,
     required this.status,
     required this.color,
   });
 
+  Future<void> _updateStatus(BuildContext context, String newStatus) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('reservations')
+          .doc(docId)
+          .update({'status': newStatus});
+      
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Reserva actualizada a: $newStatus')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _contactClient(BuildContext context) async {
+    if (clientPhone == null || clientPhone!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El cliente no dejó teléfono de contacto')),
+      );
+      return;
+    }
+
+    final cleanPhone = clientPhone!.replaceAll(RegExp(r'\D'), '');
+    // Ensure it has country code if possible, or assume Chile (+56) if missing
+    // For simplicity, just use what is provided, assuming user enters it or we cleaned it enough.
+    // If it starts with 9 (common in Chile without +56), prepend +56.
+    String finalPhone = cleanPhone;
+    if (finalPhone.length == 9 && finalPhone.startsWith('9')) {
+        finalPhone = '56$finalPhone';
+    }
+    
+    final url = Uri.parse('https://wa.me/$finalPhone');
+    
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw 'No se pudo abrir WhatsApp';
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo abrir WhatsApp')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    bool isPending = (status == 'Pendiente');
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -142,10 +202,29 @@ class _AgendaItem extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    client,
-                    style: const TextStyle(color: Colors.black87),
-                  ),
+                      Text(
+                        client,
+                        style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500),
+                      ),
+                  if (clientPhone != null && clientPhone!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 36,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _contactClient(context),
+                          icon: const Icon(Icons.chat, size: 18, color: Colors.white),
+                          label: const Text('Contactar por WhatsApp', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -165,20 +244,40 @@ class _AgendaItem extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      status,
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (isPending)
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.check_circle, color: Colors.green),
+                              onPressed: () => _updateStatus(context, 'Confirmado'),
+                              tooltip: 'Aceptar',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.cancel, color: Colors.red),
+                              onPressed: () => _updateStatus(context, 'Rechazado'),
+                              tooltip: 'Rechazar',
+                            ),
+                          ],
+                        ),
+                    ],
                   )
                 ],
               ),

@@ -218,7 +218,7 @@ class _HeaderCard extends StatelessWidget {
               _StatCard(
                 icon: Icons.star,
                 iconColor: Colors.amber,
-                value: professional.rating.toStringAsFixed(1),
+                value: professional.jobsDone == 0 ? 'Nuevo' : professional.rating.toStringAsFixed(1),
                 label: 'Calificación',
               ),
               const SizedBox(width: 10),

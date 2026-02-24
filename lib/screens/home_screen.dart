@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'client/client_reservations_screen.dart';
 import 'client/client_profile_screen.dart';
 import '../models/professional.dart';
@@ -8,6 +9,10 @@ import '../widgets/professional_card.dart';
 import 'professional/professional_profile_screen.dart';
 import '../utils/categories_data.dart';
 import '../utils/chile_data.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../widgets/responsive_layout.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +29,36 @@ class _HomeScreenState extends State<HomeScreen> {
   final _searchCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _loadUserLocation();
+  }
+
+  Future<void> _loadUserLocation() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('clients').doc(uid).get();
+        if (doc.exists && mounted) {
+          final data = doc.data() as Map<String, dynamic>;
+          final savedRegion = data['region'] as String?;
+          final savedCommune = data['commune'] as String?;
+
+          if (savedRegion != null && savedCommune != null) {
+            setState(() {
+              _selectedRegion = savedRegion;
+              _selectedCommune = savedCommune;
+            });
+          }
+        }
+      } catch (e) {
+        // Fail silently or log
+        debugPrint('Error loading user location: $e');
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
@@ -31,33 +66,76 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
-      body: [
-        _buildHomeContent(),
-        const ClientReservationsScreen(),
-        const ClientProfileScreen(),
-      ][navIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navIndex,
-        onDestinationSelected: (v) => setState(() => navIndex = v),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Inicio',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_today_outlined),
-            selectedIcon: Icon(Icons.calendar_today),
-            label: 'Reservas',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Perfil',
-          ),
-        ],
+    final cs = Theme.of(context).colorScheme;
+    final content = [
+      _buildHomeContent(),
+      const ClientReservationsScreen(),
+      const ClientProfileScreen(),
+    ][navIndex];
+
+    return ResponsiveLayout(
+      mobileBody: Scaffold(
+        backgroundColor: const Color(0xFFF6F7FB),
+        body: content,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: navIndex,
+          onDestinationSelected: (v) => setState(() => navIndex = v),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Inicio',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.calendar_today_outlined),
+              selectedIcon: Icon(Icons.calendar_today),
+              label: 'Reservas',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Perfil',
+            ),
+          ],
+        ),
+      ),
+      desktopBody: Scaffold(
+        backgroundColor: const Color(0xFFF6F7FB),
+        body: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: navIndex,
+              onDestinationSelected: (v) => setState(() => navIndex = v),
+              labelType: NavigationRailLabelType.all,
+              destinations: const [
+                 NavigationRailDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home),
+                  label: Text('Inicio'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.calendar_today_outlined),
+                  selectedIcon: Icon(Icons.calendar_today),
+                  label: Text('Reservas'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: Text('Perfil'),
+                ),
+              ],
+            ),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: content,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -181,9 +259,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   return Professional.fromFirestore(data, doc.id);
                 }).toList();
                 
-                return Column(
-                  children: _buildFilteredList(allPros, context),
-                );
+                return ResponsiveLayout.isDesktop(context)
+                    ? Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        alignment: WrapAlignment.start,
+                        children: _buildFilteredList(allPros, context, isDesktop: true),
+                      )
+                    : Column(
+                        children: _buildFilteredList(allPros, context, isDesktop: false),
+                      );
               },
             ),
             Container(
@@ -296,7 +381,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  List<Widget> _buildFilteredList(List<Professional> allPros, BuildContext context) {
+  List<Widget> _buildFilteredList(List<Professional> allPros, BuildContext context, {bool isDesktop = false}) {
       // 2. Filter client-side
       final displayPros = _selectedCategory == 'Todos'
           ? allPros
@@ -347,8 +432,9 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       return locationFiltered
-          .map((p) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+          .map((p) => Container(
+                width: isDesktop ? 350 : null, // Fixed width for desktop grid
+                margin: const EdgeInsets.only(bottom: 10),
                 child: ProfessionalCard(
                   professional: p,
                   onTap: () {
@@ -440,6 +526,72 @@ class _HomeScreenState extends State<HomeScreen> {
                         : (val) => setModalState(() => tempCommune = val),
                   ),
                   const Spacer(),
+                  // GPS Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        try {
+                          // 1. Check Permissions
+                          var status = await Permission.location.request();
+                          if (!status.isGranted) throw 'Permiso denegado';
+
+                          // 2. Get Position
+                          final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+
+                          // 3. Get Address
+                          final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
+                          if (placemarks.isEmpty) throw 'No se pudo obtener la dirección';
+                          
+                          final place = placemarks.first;
+                          final detectedCommune = place.subLocality ?? place.locality ?? '';
+                          
+                          // 4. Find in ChileData
+                          String? foundRegion;
+                          String? foundCommune;
+
+                          // Search for the commune in our data
+                          for (var entry in ChileData.regiones.entries) {
+                            final regionName = entry.key;
+                            final communes = entry.value;
+                            
+                            // Simple case-insensitive match
+                            final match = communes.firstWhere(
+                              (c) => c.toLowerCase() == detectedCommune.toLowerCase(), 
+                              orElse: () => '',
+                            );
+
+                            if (match.isNotEmpty) {
+                              foundRegion = regionName;
+                              foundCommune = match; // Use the exact string from our data
+                              break;
+                            }
+                          }
+
+                          if (foundRegion != null && foundCommune != null) {
+                            setModalState(() {
+                              tempRegion = foundRegion;
+                              tempCommune = foundCommune;
+                            });
+                             ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text('📍 Detectado: $foundCommune, $foundRegion')),
+                            );
+                          } else {
+                            throw 'Tu comuna ($detectedCommune) no está en nuestra lista de cobertura.';
+                          }
+
+                        } catch (e) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text('Error GPS: $e')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.my_location),
+                      label: const Text('Usar mi ubicación actual'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     height: 50,

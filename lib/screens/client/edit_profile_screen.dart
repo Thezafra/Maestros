@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../utils/chile_data.dart';
+
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
 
@@ -16,6 +18,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameCtrl;
   late TextEditingController _phoneCtrl;
   late TextEditingController _addressCtrl;
+  String? _selectedRegion;
+  String? _selectedCommune;
   bool _isLoading = false;
 
   @override
@@ -24,6 +28,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameCtrl = TextEditingController(text: widget.userData['name'] ?? '');
     _phoneCtrl = TextEditingController(text: widget.userData['phone'] ?? '');
     _addressCtrl = TextEditingController(text: widget.userData['address'] ?? '');
+    
+    // Initialize dropdowns safely
+    _selectedRegion = widget.userData['region'];
+    _selectedCommune = widget.userData['commune'];
+    
+    // Validate if region/commune still exist in data (optional check)
+    if (_selectedRegion != null && !ChileData.regiones.containsKey(_selectedRegion)) {
+      _selectedRegion = null;
+      _selectedCommune = null;
+    }
   }
 
   @override
@@ -46,6 +60,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           'name': _nameCtrl.text.trim(),
           'phone': _phoneCtrl.text.trim(),
           'address': _addressCtrl.text.trim(),
+          'region': _selectedRegion,
+          'commune': _selectedCommune,
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
@@ -142,6 +158,58 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextFormField(
                 controller: _addressCtrl,
                 decoration: _inputDecoration('Ej. Av. Providencia 1234'),
+              ),
+              const SizedBox(height: 20),
+
+              // Region & Commune Dropdowns
+              _buildLabel('Ubicación (Para encontrar maestros cercanos)'),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _selectedRegion,
+                      decoration: const InputDecoration(
+                        labelText: 'Región',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                      isExpanded: true,
+                      items: ChileData.regiones.keys.map((r) {
+                        return DropdownMenuItem(value: r, child: Text(r));
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedRegion = val;
+                          _selectedCommune = null; // Reset commune
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedCommune,
+                      decoration: const InputDecoration(
+                        labelText: 'Comuna',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                      isExpanded: true,
+                      items: _selectedRegion == null
+                          ? []
+                          : ChileData.regiones[_selectedRegion]!.map((c) {
+                              return DropdownMenuItem(value: c, child: Text(c));
+                            }).toList(),
+                      onChanged: _selectedRegion == null
+                          ? null
+                          : (val) => setState(() => _selectedCommune = val),
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 40),
