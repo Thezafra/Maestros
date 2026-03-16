@@ -28,6 +28,10 @@ class Professional {
   final String? certificationNumber;
   final bool isVerified;
 
+  // ✅ NUEVOS CAMPOS PARA IMÁGENES
+  final String? photoUrl;
+  final List<String> gallery;
+
   const Professional({
     required this.id,
     required this.name,
@@ -46,6 +50,8 @@ class Professional {
     required this.rut,
     this.certificationNumber,
     this.isVerified = false,
+    this.photoUrl,
+    this.gallery = const [],
   });
 
   // Alias para tu UI
@@ -69,6 +75,8 @@ class Professional {
       rut: data['rut'] ?? '',
       certificationNumber: data['certificationNumber'],
       isVerified: data['isVerified'] ?? false,
+      photoUrl: data['photoUrl'],
+      gallery: List<String>.from(data['gallery'] ?? []),
     );
   }
 }

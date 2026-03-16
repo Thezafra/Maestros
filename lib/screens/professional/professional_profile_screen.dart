@@ -80,13 +80,15 @@ class ProfessionalProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
-                    height: 78,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: 3,
-                      separatorBuilder: (_, __) => const SizedBox(width: 10),
-                      itemBuilder: (_, __) => _WorkThumb(),
-                    ),
+                    height: 100, // Un poco más alto para que se vea mejor
+                    child: professional.gallery.isEmpty
+                      ? Center(child: Text('No hay fotos en la galería', style: TextStyle(color: cs.onSurface.withOpacity(.4))))
+                      : ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: professional.gallery.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 10),
+                          itemBuilder: (_, index) => _WorkThumb(imageUrl: professional.gallery[index]),
+                        ),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -172,7 +174,10 @@ class _HeaderCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _ProfileAvatar(avatarAsset: professional.avatarAsset),
+              _ProfileAvatar(
+                avatarAsset: professional.avatarAsset,
+                photoUrl: professional.photoUrl,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -244,7 +249,8 @@ class _HeaderCard extends StatelessWidget {
 
 class _ProfileAvatar extends StatelessWidget {
   final String? avatarAsset;
-  const _ProfileAvatar({required this.avatarAsset});
+  final String? photoUrl;
+  const _ProfileAvatar({required this.avatarAsset, this.photoUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -254,16 +260,23 @@ class _ProfileAvatar extends StatelessWidget {
       radius: 32,
       backgroundColor: cs.surfaceContainerHighest,
       child: ClipOval(
-        child: (avatarAsset == null || avatarAsset!.isEmpty)
-            ? Icon(Icons.person, size: 34, color: cs.onSurface.withOpacity(.6))
-            : Image.asset(
-                avatarAsset!,
+        child: photoUrl != null
+            ? Image.network(
+                photoUrl!,
                 width: 64,
                 height: 64,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Icon(Icons.person, size: 34, color: cs.onSurface.withOpacity(.6)),
-              ),
+                errorBuilder: (_, __, ___) => Icon(Icons.person, size: 34, color: cs.onSurface.withOpacity(.6)),
+              )
+            : (avatarAsset == null || avatarAsset!.isEmpty)
+                ? Icon(Icons.person, size: 34, color: cs.onSurface.withOpacity(.6))
+                : Image.asset(
+                    avatarAsset!,
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(Icons.person, size: 34, color: cs.onSurface.withOpacity(.6)),
+                  ),
       ),
     );
   }
@@ -308,18 +321,26 @@ class _StatCard extends StatelessWidget {
 }
 
 class _WorkThumb extends StatelessWidget {
+  final String imageUrl;
+  const _WorkThumb({required this.imageUrl});
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Container(
-      width: 78,
-      height: 78,
+      width: 100,
+      height: 100,
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withOpacity(.5),
+        color: Colors.grey[200],
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Icon(Icons.image_outlined, color: cs.onSurface.withOpacity(.5)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.grey),
+        ),
+      ),
     );
   }
 }

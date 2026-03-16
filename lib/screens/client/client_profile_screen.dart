@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'client_reservations_screen.dart';
+import '../support/support_center_screen.dart';
 
 class ClientProfileScreen extends StatelessWidget {
   const ClientProfileScreen({super.key});
@@ -18,6 +19,8 @@ class ClientProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
       appBar: AppBar(
@@ -39,99 +42,164 @@ class ClientProfileScreen extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('clients')
-                  .doc(FirebaseAuth.instance.currentUser?.uid)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+        child: user == null
+            ? _buildGuestView(context)
+            : StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('clients')
+                    .doc(user.uid)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                final userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-                final name = userData['name'] ?? 'Usuario';
-                final email = userData['email'] ?? 'No email';
-                final photoUrl = userData['photoUrl'];
+                  final userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+                  final name = userData['name'] ?? 'Usuario';
+                  final email = userData['email'] ?? 'No email';
+                  final photoUrl = userData['photoUrl'];
 
-                return Column(
-                  children: [
-                    const SizedBox(height: 20),
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.deepPurple,
-                      backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-                      child: photoUrl == null
-                          ? const Icon(Icons.person, size: 50, color: Colors.white)
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                  return Column(
+                    children: [
+                      const SizedBox(height: 20),
+                      CircleAvatar(
+                        radius: 50,
+                        backgroundColor: Colors.deepPurple,
+                        backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                        child: photoUrl == null
+                            ? const Icon(Icons.person, size: 50, color: Colors.white)
+                            : null,
                       ),
-                    ),
-                    Text(
-                      email,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
+                      const SizedBox(height: 16),
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-                    
-                    // Options
-                    _ProfileOption(
-                      icon: Icons.calendar_month_outlined,
-                      title: 'Mis Reservas',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ClientReservationsScreen()),
-                        );
-                      },
-                    ),
-                    _ProfileOption(
-                      icon: Icons.person_outline,
-                      title: 'Editar Perfil',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => EditProfileScreen(userData: userData),
-                          ),
-                        );
-                      },
-                    ),
-                    // Payment Methods removed
-                    _ProfileOption(
-                      icon: Icons.favorite_border,
-                      title: 'Favoritos',
-                      onTap: () {
-                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Próximamente: Favoritos')),
-                        );
-                      },
-                    ),
-                    _ProfileOption(
-                      icon: Icons.help_outline,
-                      title: 'Ayuda / Soporte',
-                      onTap: () {},
-                    ),
-                    const SizedBox(height: 20),
-                    _ProfileOption(
-                      icon: Icons.logout,
-                      title: 'Cerrar Sesión',
-                      isDestructive: true,
-                      onTap: () => _logout(context),
-                    ),
-                  ],
-                );
-              },
-            ),
+                      Text(
+                        email,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Options
+                      _ProfileOption(
+                        icon: Icons.calendar_month_outlined,
+                        title: 'Mis Reservas',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ClientReservationsScreen()),
+                          );
+                        },
+                      ),
+                      _ProfileOption(
+                        icon: Icons.person_outline,
+                        title: 'Editar Perfil',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditProfileScreen(userData: userData),
+                            ),
+                          );
+                        },
+                      ),
+                      _ProfileOption(
+                        icon: Icons.favorite_border,
+                        title: 'Favoritos',
+                        onTap: () {
+                           ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Próximamente: Favoritos')),
+                          );
+                        },
+                      ),
+                      _ProfileOption(
+                        icon: Icons.help_outline,
+                        title: 'Ayuda / Soporte',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SupportCenterScreen()),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      _ProfileOption(
+                        icon: Icons.logout,
+                        title: 'Cerrar Sesión',
+                        isDestructive: true,
+                        onTap: () => _logout(context),
+                      ),
+                    ],
+                  );
+                },
+              ),
       ),
+    );
+  }
+
+  Widget _buildGuestView(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const SizedBox(height: 60),
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.deepPurple.withOpacity(.05),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.person_outline, size: 80, color: Colors.deepPurple),
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          '¿Eres parte de Koippo?',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            'Regístrate para guardar tus datos, gestionar tus reservas y acceder a funciones exclusivas.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.black54, fontSize: 16),
+          ),
+        ),
+        const SizedBox(height: 40),
+        SizedBox(
+          width: 200,
+          height: 50,
+          child: FilledButton(
+            onPressed: () {
+              Navigator.of(context).pushNamedAndRemoveUntil('/client_login', (route) => false);
+            },
+            child: const Text('Iniciar Sesión'),
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextButton(
+          onPressed: () => _logout(context),
+          child: const Text('Cerrar Sesión (Salir como invitado)', 
+            style: TextStyle(color: Colors.red)),
+        ),
+        const SizedBox(height: 24),
+        _ProfileOption(
+          icon: Icons.help_outline,
+          title: 'Ayuda / Soporte',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SupportCenterScreen()),
+            );
+          },
+        ),
+      ],
     );
   }
 }

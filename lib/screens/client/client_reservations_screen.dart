@@ -11,6 +11,12 @@ class ClientReservationsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     initializeDateFormatting('es_CL', null);
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return _buildGuestView(context);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
       appBar: AppBar(
@@ -28,7 +34,7 @@ class ClientReservationsScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('reservations')
-            .where('clientId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+            .where('clientId', isEqualTo: user.uid)
             .orderBy('createdAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -88,6 +94,64 @@ class ClientReservationsScreen extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildGuestView(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F7FB),
+      appBar: AppBar(
+        title: const Text('Mis Reservas'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: const TextStyle(
+          color: Colors.black,
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.withOpacity(.05),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.calendar_today_outlined, size: 60, color: Colors.deepPurple),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Gestiona tus Reservas',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Para solicitar servicios y ver tus reservas activas, necesitas iniciar sesión en tu cuenta de Koippo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black54, fontSize: 16),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: 200,
+                height: 50,
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.of(context).pushNamedAndRemoveUntil('/client_login', (route) => false);
+                  },
+                  child: const Text('Iniciar Sesión'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

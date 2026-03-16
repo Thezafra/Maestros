@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'edit_professional_profile_screen.dart';
+import '../support/support_center_screen.dart';
 
 class ProfessionalProfileView extends StatelessWidget {
   const ProfessionalProfileView({super.key});
@@ -87,6 +88,12 @@ class ProfessionalProfileView extends StatelessWidget {
               }),
               _optionTile(Icons.settings_outlined, 'Configuración', () {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Próximamente: Configuración')));
+              }),
+              _optionTile(Icons.help_outline, 'Ayuda / Soporte', () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SupportCenterScreen()),
+                );
               }),
               
               const SizedBox(height: 20),

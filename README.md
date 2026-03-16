@@ -1,6 +1,6 @@
-# App Maestros 🛠️
+# Koippo 🛠️
 
-**Maestros** es una aplicación moderna en Flutter diseñada para conectar profesionales de servicios del hogar (gasfíteres, electricistas, carpinteros, etc.) con clientes en Chile.
+**Koippo** es una aplicación moderna en Flutter diseñada para conectar profesionales de servicios del hogar (gasfíteres, electricistas, carpinteros, etc.) con clientes en Chile.
 
 ## Características
 
